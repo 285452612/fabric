@@ -20,6 +20,7 @@ import (
 	"crypto/ecdsa"
 
 	"fmt"
+
 	"github.com/hyperledger/fabric/core/crypto/primitives"
 	"github.com/hyperledger/fabric/core/crypto/utils"
 	obc "github.com/hyperledger/fabric/protos"
@@ -29,8 +30,6 @@ import (
 
 type validatorImpl struct {
 	*peerImpl
-
-	isInitialized bool
 
 	// Chain
 	chainPrivateKey primitives.PrivateKey
@@ -57,15 +56,7 @@ func (validator *validatorImpl) TransactionPreExecution(tx *obc.Transaction) (*o
 	}
 
 	//	validator.debug("Pre executing [%s].", tx.String())
-	validator.debug("Tx confdential level [%s].", tx.ConfidentialityLevel.String())
-
-	if validityPeriodVerificationEnabled() {
-		tx, err := validator.verifyValidityPeriod(tx)
-		if err != nil {
-			validator.error("TransactionPreExecution: error verifying certificate validity period %s:", err)
-			return tx, err
-		}
-	}
+	validator.Debugf("Tx confdential level [%s].", tx.ConfidentialityLevel.String())
 
 	switch tx.ConfidentialityLevel {
 	case obc.ConfidentialityLevel_PUBLIC:
@@ -73,12 +64,12 @@ func (validator *validatorImpl) TransactionPreExecution(tx *obc.Transaction) (*o
 
 		return tx, nil
 	case obc.ConfidentialityLevel_CONFIDENTIAL:
-		validator.debug("Clone and Decrypt.")
+		validator.Debug("Clone and Decrypt.")
 
 		// Clone the transaction and decrypt it
 		newTx, err := validator.deepCloneAndDecryptTx(tx)
 		if err != nil {
-			validator.error("Failed decrypting [%s].", err.Error())
+			validator.Errorf("Failed decrypting [%s].", err.Error())
 
 			return nil, err
 		}
@@ -111,7 +102,7 @@ func (validator *validatorImpl) Verify(vkID, signature, message []byte) error {
 
 	cert, err := validator.getEnrollmentCert(vkID)
 	if err != nil {
-		validator.error("Failed getting enrollment cert for [% x]: [%s]", vkID, err)
+		validator.Errorf("Failed getting enrollment cert for [% x]: [%s]", vkID, err)
 
 		return err
 	}
@@ -120,13 +111,13 @@ func (validator *validatorImpl) Verify(vkID, signature, message []byte) error {
 
 	ok, err := validator.verify(vk, message, signature)
 	if err != nil {
-		validator.error("Failed verifying signature for [% x]: [%s]", vkID, err)
+		validator.Errorf("Failed verifying signature for [% x]: [%s]", vkID, err)
 
 		return err
 	}
 
 	if !ok {
-		validator.error("Failed invalid signature for [% x]", vkID)
+		validator.Errorf("Failed invalid signature for [% x]", vkID)
 
 		return utils.ErrInvalidSignature
 	}
@@ -136,43 +127,32 @@ func (validator *validatorImpl) Verify(vkID, signature, message []byte) error {
 
 // Private Methods
 
-func (validator *validatorImpl) register(id string, pwd []byte, enrollID, enrollPWD string) error {
-	if validator.isInitialized {
-		validator.error("Registering...done! Initialization already performed", enrollID)
-
-		return utils.ErrAlreadyInitialized
-	}
-
+func (validator *validatorImpl) register(id string, pwd []byte, enrollID, enrollPWD string, regFunc registerFunc) error {
 	// Register node
-	if err := validator.peerImpl.register(NodeValidator, id, pwd, enrollID, enrollPWD); err != nil {
-		log.Error("Failed registering [%s]: [%s]", enrollID, err)
+	if err := validator.peerImpl.register(NodeValidator, id, pwd, enrollID, enrollPWD, nil); err != nil {
+		validator.Errorf("Failed registering [%s]: [%s]", enrollID, err)
 		return err
 	}
 
 	return nil
 }
 
-func (validator *validatorImpl) init(name string, pwd []byte) error {
-	if validator.isInitialized {
-		validator.error("Already initializaed.")
+func (validator *validatorImpl) init(name string, pwd []byte, regFunc registerFunc) error {
 
-		return utils.ErrAlreadyInitialized
+	validatorInitFunc := func(eType NodeType, name string, pwd []byte) error {
+		// Init crypto engine
+		err := validator.initCryptoEngine()
+		if err != nil {
+			validator.Errorf("Failed initiliazing crypto engine [%s].", err.Error())
+			return err
+		}
+
+		return nil
 	}
 
-	// Register node
-	if err := validator.peerImpl.init(NodeValidator, name, pwd); err != nil {
+	if err := validator.peerImpl.init(NodeValidator, name, pwd, validatorInitFunc); err != nil {
 		return err
 	}
-
-	// Init crypto engine
-	err := validator.initCryptoEngine()
-	if err != nil {
-		validator.error("Failed initiliazing crypto engine [%s].", err.Error())
-		return err
-	}
-
-	// initialized
-	validator.isInitialized = true
 
 	return nil
 }

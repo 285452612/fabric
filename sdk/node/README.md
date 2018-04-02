@@ -1,83 +1,52 @@
-# Hyperledger Client SDK for Node.js
+## Hyperledger Fabric Client SDK for Node.js
 
-The Hyperledger Client SDK (HLC) provides APIs through which a client may easily interact with the Hyperledger blockchain from a Node.js application.
+The Hyperledger Fabric Client SDK (HFC) provides a powerful and easy to use API to interact with a Hyperledger Fabric blockchain.
 
-## Terminology
+To learn about how to install and use the Node.js SDK, please visit the [fabric documentation](http://hyperledger-fabric.readthedocs.io/en/latest/Setup/NodeSDK-setup).
 
-To understand the implementation details inside [hlc.js](./hlc.js) please read and understand the terminology below.
+The [Going Deeper](#going-deeper) section discusses HFC's pluggability and extensibility design. It also describes the main object hierarchy to help you get started in navigating the reference documentation. The top-level class is `Chain`.
 
-* Member
+The [Future Work](#future-work) section describes some upcoming work to be done.
 
-  An identity for participating in blockchain transactions. There are different types of members: users, peers, validators, etc.
+   **WARNING**: To view the reference documentation correctly, you first need to build the SDK and confirm functionality by [running the unit tests](#running-unit-tests). Subsequently open the following URLs directly in your browser. Be sure to replace YOUR-FABRIC-DIR with the path to your fabric directory.
 
-* Member Services
+   `file:///YOUR-FABRIC-DIR/sdk/node/doc/modules/_hfc_.html`
 
-  Services related to registering, enrolling, and otherwise managing members.
+   `file:///YOUR-FABRIC-DIR/sdk/node/doc/classes/_hfc_.chain.html`
 
-* Registration
+### Going Deeper
 
-   The act of adding a new member identity (with specific privileges) to the system. This is done by an administrator, or more accurately, a member (called a registrar) with the 'registrar' privilege. The registrar specifies the new member privileges when registering the new member. The output of registration is an enrollment secret (i.e. a one-time password).
+#### Pluggability
+HFC was designed to support two pluggable components:
 
-* Enrollment
+1. Pluggable key value store which is used to retrieve and store keys associated with a member. The key value store is used to store sensitive private keys, so care must be taken to properly protect access.
 
-  The act of completing registration and obtaining credentials which are used to transact on the blockchain. Enrollment may be done by the end user, in which case only the end user has access to his/her credentials. Alternatively, the registrar may have delegated authority to act on behalf of the end user, in which case the registrar also performs enrollment for the user.
+2. Pluggable member service which is used to register and enroll members. Member services enables hyperledger to be a permissioned blockchain, providing security services such as anonymity, unlinkability of transactions, and confidentiality
 
-## Pluggability
+#### HFC objects and reference documentation
+HFC is written primarily in typescript and is object-oriented. The source can be found in the `fabric/sdk/node/src` directory.
 
-These APIs have been designed to support two pluggable components.
+To go deeper, you can view the reference documentation in your browser by opening the [reference documentation](doc/modules/_hfc_.html) and clicking on **"hfc"** on the right-hand side under **"Globals"**. This will work after you have built the SDK per the instruction [here](#building-the-client-sdk).
 
-1. Pluggable key value store which is used to retrieve and store keys associated with a member.
+The following is a high-level description of the HFC objects (classes and interfaces) to help guide you through the object hierarchy.
 
-2. Pluggable member service which is used to register and enroll members.
+* The main top-level class is [Chain](doc/classes/_hfc_.chain.html). It is the client's representation of a chain. HFC allows you to interact with multiple chains and to share a single [KeyValStore](doc/interfaces/_hfc_.keyvalstore.html) and [MemberServices](doc/interfaces/_hfc_.memberservices.html) object with multiple Chain objects as needed. For each chain, you add one or more [Peer](doc/classes/_hfc_.peer.html) objects which represents the endpoint(s) to which HFC connects to transact on the chain.
 
-## Unit Tests
+* The [KeyValStore](doc/interfaces/_hfc_.keyvalstore.html) is a very simple interface which HFC uses to store and retrieve all persistent data. This data includes private keys, so it is very important to keep this storage secure. The default implementation is a simple file-based version found in the [FileKeyValStore](doc/classes/_hfc_.filekeyvalstore.html) class.
 
-The HLC SDK includes unit tests implemented with the [tape framework](https://github.com/substack/tape) and output prettified with [tap-spec](https://github.com/scottcorgan/tap-spec).
+* The [MemberServices](doc/interfaces/_hfc_.memberservices.html) interface is implemented by the [MemberServicesImpl](doc/classes/_hfc_.memberservicesimpl.html) class and provides security and identity related features such as privacy, unlinkability, and confidentiality. This implementation issues *ECerts* (enrollment certificates) and *TCerts* (transaction certificates). ECerts are for enrollment identity and TCerts are for transactions.
 
-To run the unit tests follow the instructions below.
+* The [Member](doc/classes/_hfc_.member.html) class most often represents an end user who transacts on the chain, but it may also represent other types of members such as peers. From the Member class, you can *register* and *enroll* members or users. This interacts with the [MemberServices](doc/interfaces/_hfc_.memberservices.html) object. You can also deploy, query, and invoke chaincode directly, which interacts with the [Peer](doc/classes/_hfc_.peer.html). The implementation for deploy, query and invoke simply creates a temporary [TransactionContext](doc/classes/_hfc_.transactioncontext.html) object and delegates the work to it.
 
-1. Build and run the Membership Service (Certificate Authority) as described [here](https://github.com/hyperledger/fabric/blob/master/docs/API/SandboxSetup.md#security-setup-optional).
+* The [TransactionContext](doc/classes/_hfc_.transactioncontext.html) class implements the bulk of the deploy, invoke, and query logic. It interacts with MemberServices to get a TCert to perform these operations. Note that there is a one-to-one relationship between TCert and TransactionContext; in other words, a single TransactionContext will always use the same TCert. If you want to issue multiple transactions with the same TCert, then you can get a [TransactionContext](doc/classes/_hfc_.transactioncontext.html) object from a [Member](doc/classes/_hfc_.member.html) object directly and issue multiple deploy, invoke, or query operations on it. Note however that if you do this, these transactions are linkable, which means someone could tell that they came from the same user, though not know which user. For this reason, you will typically just call deploy, invoke, and query on the User or Member object.
 
-2. Enable the security and privacy on the peer. To do so, modify the [core.yaml](https://github.com/hyperledger/fabric/blob/master/peer/core.yaml) configuration file to set the <b>security.enabled</b> value to 'true' and <b>security.privacy</b> value to 'true'. Subsequently, build and run the peer process with the following commands. Alternatively, you may start the peer by setting the appropriate environment variables as described [here](https://github.com/hyperledger/fabric/blob/master/docs/API/SandboxSetup.md#vagrant-terminal-1-validating-peer).
+## Future Work
+The following is a list of known remaining work to be done.
 
-    ```
-    cd $GOPATH/src/github.com/hyperledger/fabric/peer
-    go build
-    ./peer node start
-    ```
+* The reference documentation needs to be made simpler to follow as there are currently some internal classes and interfaces that are being exposed.
 
-3. Switch to the HCL directory and install the necessary Node.js module dependencies.
+* We are investigating how to make deployment of a chaincode simpler by not requiring you to set up a specific directory structure with dependencies.
 
-    ```
-    cd $GOPATH/src/github.com/hyperledger/fabric/sdk/node
-    npm install
-    ```
+* Implement events appropriately, both custom and non-custom. The 'complete' event for `deploy` and `invoke` is currently implemented by simply waiting a set number of seconds (5 for invoke, 20 for deploy). It needs to receive a complete event from the server with the result of the transaction and make this available to the caller. This has not yet been implemented.
 
-4. Run the Node.js unit tests with the following commands.
-
-    ```
-    cd $GOPATH/src/github.com/hyperledger/fabric/sdk/node
-    node test/unit/chain-tests.js | node_modules/.bin/tap-spec
-    ```
-
-5. If the tests fail and you see errors regarding port forwarding, similar to the one below, that implies that you do not have correct port forwarding enabled in Vagrant.
-
-    ```
-    tcp_client_posix.c:173] failed to connect to 'ipv6:[::1]:50051': socket error: connection refused
-    ```
-
-To address this, make sure your Vagrant setup has port forwarding enabled for port 50051 as the tests connect to the membership services on that port. Check your [Vagrantfile](https://github.com/hyperledger/fabric/blob/master/devenv/Vagrantfile) to confirm that the following line is present. If not, modify your Vagrantfile to include it, then issue the command `vagrant reload`.
-
-    ```
-    config.vm.network :forwarded_port, guest: 50051, host: 50051 # Membership service
-    ```
-
-If you see errors stating that the client has already been registered/enrolled, keep in mind that you can perform the enrollment process only once, as the enrollmentSecret is a one-time-use password. You will see these errors if you have performed a user registration/enrollment and subsequently deleted the crypto tokens stored on the client side. The next time you try to enroll, errors similar to the ones below will be seen.
-
-    Error: identity or token do not match
-
-or
-
-    Error: user is already registered
-
-To address this, remove any stored crypto material from the CA server by following the instructions [here](https://github.com/hyperledger/fabric/blob/master/docs/API/SandboxSetup.md#removing-temporary-files-when-security-is-enabled). If you are running a clean test, you will also want to remove any of the crypto tokens stored on the client side by deleting the KeyValStore directory. That directory is configurable, and is set to `/tmp/keyValStore` within the unit tests.
+* Support SHA2. HFC currently supports SHA3.

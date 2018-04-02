@@ -11,22 +11,24 @@ This document covers the available APIs for interacting with a peer node. Three 
    * [Marbles Demo Application](#marbles-demo-application)
    * [Commercial Paper Demo Application](#commercial-paper-demo-application)
 
-**Note:** If you are working with APIs with security enabled, please review the [security setup instructions](https://github.com/hyperledger/fabric/blob/master/docs/API/SandboxSetup.md#security-setup-optional) before proceeding.
+**Note:** If you are working with APIs with security enabled, please review the [security setup instructions](https://github.com/hyperledger/fabric/blob/master/docs/Setup/Chaincode-setup.md#security-setup-optional) before proceeding.
 
 ## CLI
 
 To view the currently available CLI commands, execute the following:
 
-    cd /opt/gopath/src/github.com/hyperledger/fabric/peer
-    ./peer
+    cd /opt/gopath/src/github.com/hyperledger/fabric
+    build/bin/peer
 
 You will see output similar to the example below (**NOTE:** rootcommand below is hardcoded in [main.go](https://github.com/hyperledger/fabric/blob/master/main.go). Currently, the build will create a *peer* executable file).
 
 ```
-    Usage:
+    Usage: 
+      peer [flags]
       peer [command]
-
-    Available Commands:
+    
+    Available Commands: 
+      version     Print fabric peer version.
       node        node specific commands.
       network     network specific commands.
       chaincode   chaincode specific commands.
@@ -35,13 +37,15 @@ You will see output similar to the example below (**NOTE:** rootcommand below is
     Flags:
       -h, --help[=false]: help for peer
           --logging-level="": Default logging level and overrides, see core.yaml for full syntax
+          --test.coverprofile="coverage.cov": Done
+      -v, --version[=false]: Show current version number of fabric peer server
 
 
     Use "peer [command] --help" for more information about a command.
 
 ```
 
-The `peer` command supports several subcommands, as shown above. To
+The `peer` command supports several subcommands and flags, as shown above. To
 facilitate its use in scripted applications, the `peer` command always
 produces a non-zero return code in the event of command failure. Upon success,
 many of the subcommands produce a result on **stdout** as shown in the table
@@ -49,6 +53,7 @@ below:
 
 Command | **stdout** result in the event of success
 --- | ---
+`version`          | String form of `peer.version` defined in [core.yaml](https://github.com/hyperledger/fabric/blob/master/peer/core.yaml)
 `node start`       | N/A
 `node status`      | String form of [StatusCode](https://github.com/hyperledger/fabric/blob/master/protos/server_admin.proto#L36)
 `node stop`        | String form of [StatusCode](https://github.com/hyperledger/fabric/blob/master/protos/server_admin.proto#L36)
@@ -63,13 +68,13 @@ Command | **stdout** result in the event of success
 
 Deploy creates the docker image for the chaincode and subsequently deploys the package to the validating peer. An example is below.
 
-`./peer chaincode deploy -p github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02 -c '{"Function":"init", "Args": ["a","100", "b", "200"]}'`
+`peer chaincode deploy -p github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02 -c '{"Function":"init", "Args": ["a","100", "b", "200"]}'`
 
 The response to the chaincode deploy command will contain the chaincode identifier (hash) which will be required on subsequent `chaincode invoke` and `chaincode query` commands in order to identify the deployed chaincode.
 
 With security enabled, modify the command to include the -u parameter passing the username of a logged in user as follows:
 
-`./peer chaincode deploy -u jim -p github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02 -c '{"Function":"init", "Args": ["a","100", "b", "200"]}'`
+`peer chaincode deploy -u jim -p github.com/hyperledger/fabric/examples/chaincode/go/chaincode_example02 -c '{"Function":"init", "Args": ["a","100", "b", "200"]}'`
 
 **Note:** If your GOPATH environment variable contains more than one element, the chaincode must be found in the first one or deployment will fail.
 
@@ -653,7 +658,7 @@ For additional information on the REST endpoints and more detailed examples, ple
 
     ```
     cd /opt/gopath/src/github.com/hyperledger/fabric
-    ./peer node start
+    build/bin/peer node start
     ```
 
 8. If you need to construct a test blockchain on the local peer node, run the the TestServerOpenchain_API_GetBlockCount test implemented inside [api_test.go](https://github.com/hyperledger/fabric/blob/master/core/rest/api_test.go). This test will create a blockchain with 5 blocks. Subsequently restart the peer process.
@@ -685,7 +690,7 @@ You can interface with the peer process from a Node.js application. One way to a
 
 2. Run a local peer node only (not a complete network) with:
 
-    `cd peer; ./peer node start`
+    `build/bin/peer node start`
 
 3. Set up a test blockchain data structure (with 5 blocks only) by running a test from within Vagrant as follows. Subsequently restart the peer process.
 
